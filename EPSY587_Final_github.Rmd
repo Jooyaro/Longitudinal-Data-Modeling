@@ -51,7 +51,8 @@ library(dplyr)
 index_length <- data %>% group_by(id) %>% summarise(length(id))
 table(index_length$`length(id)`)
 ```
-There are different number of observations due to the design of the study (e.g., a junior would have a most 2 years of data while a freshman could have 4 years of data).
+There are different number of observations due to the design of the study
+(e.g., a junior would have a most 2 years of data while a freshman could have 4 years of data).
 
 
 ```{r, echo=FALSE}
@@ -67,7 +68,11 @@ data_temp %>%
     geom_boxplot(fill=c("yellow","green"), alpha = 0.2) +
     xlab("Parent(p) and Youth(y)")
 ```
-We have observed the relation between our dependent variable, "youth_dev", and other variables. Specifically, we have found a low-level positive correlation ($0.109$) between the deviant attitude scores of youth and those of their parents. To calculate the deviant attitude scores of youth, we used the mean score from the four-year period. The accompanying boxplots indicate that parents tend to have stricter standards regarding deviant behaviors compared to their children. Moreover, the data suggests that female youth have slightly stricter standards compared to their male counterparts.
+We have observed the relation between our dependent variable, "youth_dev", and other variables.
+Specifically, we have found a low-level positive correlation ($0.109$) between the deviant attitude scores of youth and those of their parents.
+To calculate the deviant attitude scores of youth, we used the mean score from the four-year period.
+The accompanying boxplots indicate that parents tend to have stricter standards regarding deviant behaviors compared to their children.
+Moreover, the data suggests that female youth have slightly stricter standards compared to their male counterparts.
 
 ```{r, echo=FALSE}
 # Boxplot (gender & youth_dev)
@@ -79,7 +84,8 @@ data %>% group_by(cohort) %>% summarise(n = length(index), mean = mean(youth_dev
 data %>% group_by(gender) %>% summarise(n = length(index), mean = mean(youth_dev), SD = sd(youth_dev), mean_par = mean(parent_att), SD_par = sd(parent_att))
 data %>% group_by(age) %>% summarise(n = length(index), mean = mean(youth_dev), SD = sd(youth_dev), mean_par = mean(parent_att), SD_par = sd(parent_att))
 ```
-The descriptive statistics additionally show that, on average, female youth have higher mean values for deviant behavior scores compared to their male counterparts. Moreover, when analyzing the means of each cohort and age, we observed a trend where children's attitudes towards deviant behavior tend to become less strict as they grow older.
+The descriptive statistics additionally show that, on average, female youth have higher mean values for deviant behavior scores compared to their male counterparts.
+Moreover, when analyzing the means of each cohort and age, we observed a trend where children's attitudes towards deviant behavior tend to become less strict as they grow older.
 
 
 ```{r, echo=FALSE}
@@ -89,7 +95,11 @@ xyplot(youth_dev ~ age |id, data=data_sub, col.line="red", type=c("p","r"), main
 xyplot(youth_dev ~ age |id, data=data_sub, col.line="red", lwd=2, type=c("p","spline"), main="Plots of Youth_Dev by Age: Spline")
 xyplot(youth_dev ~ age |id, data=data_sub, col.line=c("red","black"), lwd=1, type=c("p","spline","r"), main="Plots of Youth_Dev by Age: Spline & Linear Regression")
 ```
-The panel plots for each individual show joint points, linear regression, spline, and spline & linear regression. These plots are based on a subset of the data for the sake of visibility. When exploring the individual structure, we found that intercepts and slopes varied among individuals. For exploratory purposes, we also examined EDA for each cohort. The general tendency of the plots is similar to that of plots for the entire cohort. We reported our results specifically for Cohort 4.
+The panel plots for each individual show joint points, linear regression, spline, and spline & linear regression.
+These plots are based on a subset of the data for the sake of visibility.
+When exploring the individual structure, we found that intercepts and slopes varied among individuals.
+For exploratory purposes, we also examined EDA for each cohort. The general tendency of the plots is similar to that of plots for the entire cohort.
+We reported our results specifically for Cohort 4.
 
 ```{r, echo=FALSE}
 # Subdata by cohort
@@ -107,7 +117,8 @@ xyplot(youth_dev ~ age |id, data=data_c4, col.line="red", type=c("p","r"), main=
 xyplot(youth_dev ~ age |id, data=data_c4, col.line="red", lwd=2, type=c("p","spline"), main="Plots of Youth_Dev by Age (Cohort4): Spline")
 xyplot(youth_dev ~ age |id, data=data_c4, col.line=c("red","black"), lwd=1, type=c("p","spline","r"), main="Plots of Youth_Dev by Age (Cohort4): Spline & Linear Regression")
 ```
-For the next step, we observed line plots for individuals, including joint points, linear regressions, and quadratic regressions, using the same subset of data. Based on the graphs for linear and quadratic regressions, it appears that youth_dev remains relatively stable across ages, with a consistent level of variance.
+For the next step, we observed line plots for individuals, including joint points, linear regressions, and quadratic regressions, using the same subset of data.
+Based on the graphs for linear and quadratic regressions, it appears that youth_dev remains relatively stable across ages, with a consistent level of variance.
 
 ```{r, echo=FALSE}
 age.youth_dev <- aggregate(youth_dev ~ age + id , data=data_sub, FUN="mean")
@@ -181,7 +192,10 @@ age.youth_dev <- aggregate(youth_dev ~ age + cohort, data = data, FUN="mean")
 
 ggplot(age.youth_dev) + geom_line(aes(age, youth_dev, colour=cohort)) + coord_cartesian(ylim = c(25,36)) + scale_x_continuous(limits = c(11, 21), breaks = seq(9,23,1)) + ggtitle("Mean Youth_dev by age seperate lines for each cohort")
 ```
-The cohort represents the age of the respondent when they join the survey. The age at which individuals start the survey appears to affect their scores of attitude toward deviant behavior, as the scores tend to decrease when individuals start the survey at an older age. Upon comparing cohorts, we found that those with lower ID numbers (i.e., Cohort 1 and 2, representing younger youth) tend to have a relatively stricter attitude towards deviant behavior.
+The cohort represents the age of the respondent when they join the survey.
+The age at which individuals start the survey appears to affect their scores of attitude toward deviant behavior,
+as the scores tend to decrease when individuals start the survey at an older age.
+Upon comparing cohorts, we found that those with lower ID numbers (i.e., Cohort 1 and 2, representing younger youth) tend to have a relatively stricter attitude towards deviant behavior.
 
 ### Mean by age by type - gender
 ```{r mean_by_year_by_type}
@@ -199,14 +213,17 @@ legend("bottomleft",legend=c("Male","Female"),col=c("blue","red"), lty=c(1,1),lw
 
 We observed that female youth tend to have a relatively stricter attitude towards deviant behavior, as indicated by their higher mean youth_dev.
 
-In summary, the graphs reveal a linear tendency in youth deviant behavior, but with different slopes and intercepts for each individual. Moreover, we observed group differences among cohorts and gender, although gender showed a relatively small group effect.
+In summary, the graphs reveal a linear tendency in youth deviant behavior, but with different slopes and intercepts for each individual.
+Moreover, we observed group differences among cohorts and gender, although gender showed a relatively small group effect.
 
 
 ## 2. Model fitting and refinement to arrive at a final model
 
 ### Exploration
 
-Firstly, we explored individual-specific models using linear regression and quadratic regression. Each individual has a maximum of 4 data available. Therefore, for fitting quadratic models, it is only meaningful to use data with complete four-year information, as the number of model parameters for the quadratic model is 3. In order to obtain SSE as well, we need at least 4 data points across all four waves. Thus, for this analysis, we utilized the data with full information.
+Firstly, we explored individual-specific models using linear regression and quadratic regression. Each individual has a maximum of 4 data available.
+Therefore, for fitting quadratic models, it is only meaningful to use data with complete four-year information, as the number of model parameters for the quadratic model is 3. 
+In order to obtain SSE as well, we need at least 4 data points across all four waves. Thus, for this analysis, we utilized the data with full information.
 
 ```{r, eval=FALSE}
 index_length <- as.data.frame(data %>% group_by(id) %>% summarise(length(id)))
@@ -297,7 +314,9 @@ lines(x,y,type='l',col="red")
 text(2.75, .85, expression(paste(R^2,"meta = .79")), cex=1.2)
 ```
 
-Next, we compared models 1 and 2 by examining the improvement gained from adding the quadratic term. Adding the quadratic term resulted in a significant increase in $R^2$, and we also looked at which gender showed a better fit with the quadratic form. Both male and female youth showed an improvement in model fit with the addition of the quadratic term.
+Next, we compared models 1 and 2 by examining the improvement gained from adding the quadratic term.
+Adding the quadratic term resulted in a significant increase in $R^2$, and we also looked at which gender showed a better fit with the quadratic form.
+Both male and female youth showed an improvement in model fit with the addition of the quadratic term.
 
 ```{r, echo=FALSE}
 # Model 1 and 2 comparison 
@@ -330,7 +349,8 @@ lines(x,y,type="l", col="red")
 legend(x="bottomright", legend=c("Male","Female"), col=c("blue","red"), pch=c(21,19), cex=1.2)
 ```
 
-For the next step, we observed the variability after fitting OLS from lm and regressing the residuals. The graph with cubic age resembles the data variance function more closely. Therefore, a covariance structure with a cubic function of age is needed.
+For the next step, we observed the variability after fitting OLS from lm and regressing the residuals.
+The graph with cubic age resembles the data variance function more closely. Therefore, a covariance structure with a cubic function of age is needed.
 
 ```{r, echo=FALSE}
 # (Mean) squared residuals
@@ -389,7 +409,9 @@ legend("topleft",col=c("blue","red"),lty=1, cex=.8,
        legend=c("Male","Female"))
 ```
 
-Then, we observed that the correlation between adjacent time points showed highest correlation, which reflect the longitudinal nature of our data. However, given that serial correlation violates the assumption that 'observations of the error term are uncorrelated with each other', we will examine this issue more closely later on.
+Then, we observed that the correlation between adjacent time points showed highest correlation, which reflect the longitudinal nature of our data.
+However, given that serial correlation violates the assumption that 'observations of the error term are uncorrelated with each other',
+we will examine this issue more closely later on.
 
 ```{r, echo=FALSE}
 # Serial correlation
@@ -420,7 +442,9 @@ colorfun <- colorRamp(c("#CC0000","white","#3366CC"), space="Lab")
 plotcorr(ctab, col=rgb(colorfun((ctab+1)/2), maxColorValue=255))
 ```
 
-To summarize, based on the above analyses, adding a quadratic term appears to enhance the goodness of fit. This improvement is likely due to the increased flexibility provided by the quadratic term in capturing the changes over time. Moreover, the presence of serial correlation suggests that additional investigation is necessary to address this issue.
+To summarize, based on the above analyses, adding a quadratic term appears to enhance the goodness of fit.
+This improvement is likely due to the increased flexibility provided by the quadratic term in capturing the changes over time.
+Moreover, the presence of serial correlation suggests that additional investigation is necessary to address this issue.
 
 ### Data modeling
 Based on previous exploratory data analysis, we established our preliminary model as below:
@@ -458,9 +482,12 @@ data$agesq <- data$age_n**2
 # Preliminary model
 summary(model.pre <- lmer(youth_dev ~ 1 + age_n + agesq + gender + age_n*gender + (1 + age_n + agesq | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))))
 ```
-The preliminary model above is evaluated as a fitted mixed model that is near singular. This means that some dimensions of the variance-covariance matrix have been estimated as nearly zero. This may lead to the concerns of overfitted models that may have poor power, higher numerical problems and mis-convergence and inappropriate application of standard inferential procedures.
+The preliminary model above is evaluated as a fitted mixed model that is near singular. 
+This means that some dimensions of the variance-covariance matrix have been estimated as nearly zero. 
+This may lead to the concerns of overfitted models that may have poor power, higher numerical problems and mis-convergence and inappropriate application of standard inferential procedures.
 
-First, we would like to begin by comparing with the simpler models. The results indicate that our preliminary model has the lowest AIC, BIC, and -2LogLikelihood values among the three models, which suggests a better model fit.
+First, we would like to begin by comparing with the simpler models. 
+The results indicate that our preliminary model has the lowest AIC, BIC, and -2LogLikelihood values among the three models, which suggests a better model fit.
 
 ```{r, echo=FALSE}
 # Empty model
@@ -472,7 +499,9 @@ model.0 <- lmer(youth_dev ~ 1 + age_n + agesq + (1|id), data=data, REML=F, contr
 screenreg(list(model.null, model.0, model.pre), custom.model.names = c("Null","Some Fixed","Preliminary"), single.row=T)
 ```
 
-Then, we included a cubic age term based on the result from the MSE. However, the inclusion of a cubic age term showed worse model fit, and still singularity problem remained. Therefore, we have decided not to include the cubic age term into our preliminary model.
+Then, we included a cubic age term based on the result from the MSE. 
+However, the inclusion of a cubic age term showed worse model fit, and still singularity problem remained. 
+Therefore, we have decided not to include the cubic age term into our preliminary model.
 ```{r, echo=FALSE}
 data$agecub <- data$agesq * data$age_n
 data$xagecub <- data$agecub/10  # re-scaling year squared for convergence
@@ -482,7 +511,10 @@ model.preCubic <- lmer(youth_dev ~ 1 + age_n + agesq + xagecub + gender + gender
 screenreg(list(model.pre, model.preCubic), custom.model.names = c("Quadratic","Cubic"), single.row=T)
 ```
 
-Then, we attempted to refine our preliminary model by adding the parent_att variable, which we initially excluded due to the weak relation with youth_dev. The addition of parent_att variable resulted in a significant improvement of model fit. Therefore, we will proceed with the revised model for further analyses. However, we still received a message ('boundary (singular) fit: see help('isSingular')') during the model.add1 process. We suspect that this issue may be related to the complexity of our model, and thus we plan to conduct further analyses to simplify the model and address the singular problem.
+Then, we attempted to refine our preliminary model by adding the parent_att variable, which we initially excluded due to the weak relation with youth_dev. 
+The addition of parent_att variable resulted in a significant improvement of model fit. Therefore, we will proceed with the revised model for further analyses.
+However, we still received a message ('boundary (singular) fit: see help('isSingular')') during the model.add1 process. 
+We suspect that this issue may be related to the complexity of our model, and thus we plan to conduct further analyses to simplify the model and address the singular problem.
 
 ```{r, echo=FALSE}
 model.add1 <- lmer(youth_dev ~ 1 + age_n + agesq + gender + parent_att + gender*age_n + parent_att*age_n + (1 + age_n + agesq | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # Adding parent_att to preliminary model
@@ -538,7 +570,9 @@ round(test.out,digits=3)
 screenreg(list(model.pre, model.add1, model.reduced2), custom.model.names = c("Prelim", "add parent_att", "Reduced2"), single.row=T)
 ```
 
-Although the corresponding LRT of the interaction term 'age_n\*parent_att' indicates the significant difference between two models with p-value $0.045$, the coefficient of interaction term is nearly zero and not significant. Thus, based on the information criteria and for a better parsimonisity, we decided to remove the interaction term in our final model.
+Although the corresponding LRT of the interaction term 'age_n\*parent_att' indicates the significant difference between two models with p-value $0.045$, 
+the coefficient of interaction term is nearly zero and not significant. 
+Thus, based on the information criteria and for a better parsimonisity, we decided to remove the interaction term in our final model.
 
 
 ```{r, echo=FALSE}
@@ -582,7 +616,9 @@ data$xagesq <- data$agesq/10  # re-scaling age squared for convergence
 model.reduced2_scaled <- lmer(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n + (1 + age_n + xagesq| id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # leave out age_n*parent_att
 ```
 
-The singular problem has not been resolved yet. Consequently, the temporary final model cannot be estimated with the lme function as it fails to converge. Thus, we decided to remove the linear and quadratic random effects to prioritize the stability of estimation. Then, we compared the models by modeling serial correlation.
+The singular problem has not been resolved yet. Consequently, the temporary final model cannot be estimated with the lme function as it fails to converge. 
+Thus, we decided to remove the linear and quadratic random effects to prioritize the stability of estimation. 
+Then, we compared the models by modeling serial correlation.
 ```{r}
 # AR(1) with no linear & quadratic random effects, no serial correlation
 nlme.final_nosc <- lme(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n, random = ~ 1 | id, data=data)
@@ -645,7 +681,8 @@ isd <- solve(diag(sqrt(diag(covY))))
 Ry <- isd %*% covY %*% isd
 ```
 
-Based on our final model, we obtained the covariance and correlation matrix for Y. The estimated correlation matrix for Y shows less correlation as the age intervals become bigger.
+Based on our final model, we obtained the covariance and correlation matrix for Y. 
+The estimated correlation matrix for Y shows less correlation as the age intervals become bigger.
 
 ## Examination of assumptions for the final model
 ### Graph EBLUPS
@@ -706,9 +743,16 @@ res.margin <- resid_marginal(nlme.final, type="pearson")
 head(res.margin)
 ```
 
-To summarize, we can observe that the points mostly lie along the straight diagonal line in the QQ Plot. Similarly, the residual plot shows that the points are relatively randomly dispersed, indicating that our final linear model is appropriate.
+To summarize, we can observe that the points mostly lie along the straight diagonal line in the QQ Plot. 
+Similarly, the residual plot shows that the points are relatively randomly dispersed, indicating that our final linear model is appropriate.
 
-The interpretation of our final model is as follows: On average, younger female youths whose parents have higher attitude scores toward deviant behavior have higher scores of attitude toward deviant behavior (which means they are stricter in deviant behavior). For a more specific interpretation, the scores of attitude toward deviant behavior for girls are on average 0.50 points higher than those of boys. Older youths tend to have lower scores than those who are younger, on average. Youths whose parents have one point higher deviant behavior attitude scores have scores that are 0.10 points higher. Youths tend to have scores that are 1.2 points lower as they age by a year. The interaction of age and gender are positive, suggesting that while growing up typically leads to lower scores of attitude toward deviant behavior, this effect is weaker for female youths.
+The interpretation of our final model is as follows: 
+On average, younger female youths whose parents have higher attitude scores toward deviant behavior have higher scores of attitude toward deviant behavior (which means they are stricter in deviant behavior). 
+For a more specific interpretation, the scores of attitude toward deviant behavior for girls are on average 0.50 points higher than those of boys.
+Older youths tend to have lower scores than those who are younger, on average. 
+Youths whose parents have one point higher deviant behavior attitude scores have scores that are 0.10 points higher. 
+Youths tend to have scores that are 1.2 points lower as they age by a year. 
+The interaction of age and gender are positive, suggesting that while growing up typically leads to lower scores of attitude toward deviant behavior, this effect is weaker for female youths.
 
 
 

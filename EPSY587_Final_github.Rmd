@@ -1,0 +1,714 @@
+---
+title: "Longitudinal Data Modeling"
+author: "Hyunjoo Kim, Nanhee Kim"
+date: '2023-06-20'
+output: rmarkdown::github_document
+email: hyunjoo5@illinois.edu, nanheek2@illinois.edu
+---
+
+```{r, echo=T, results='hide'}
+setwd("/Users/hyunjookim/Desktop/Hyunjoo(Illinois)/2023-Spring/EPSY 587/Final")
+
+library(lme4)
+library(lmerTest)
+library(texreg)
+library(optimx)
+library(lattice)
+library(ggplot2)
+library(ellipse)
+library(reshape2)
+library(HLMdiag)
+library(formula.tools)
+library(dplyr)
+library(gridExtra)
+library(nlme)
+```
+
+## 1. Basic descriptive statistics and exploratory analysis of the data
+```{r, echo=FALSE, eval=FALSE}
+# Load data
+data <- read.table("r_nyls_data.txt", header=TRUE)
+colSums(is.na(data)) # Check # of missing data
+dim(data)
+
+# Add integer individual id called index
+id <- unique(data$id) 
+index <- seq(1:length(id))
+to.add <- cbind(id,index)
+data <- merge(data, to.add, by=c("id"))
+n <- length(index)
+
+# Make id, gender, cohort factor variables
+data$id <- as.factor(data$id)
+data$gender <- as.factor(data$gender)
+data$cohort <- as.factor(data$cohort)
+```
+The National Youth Longitudinal Study data has 6287 observations of 7 variables with no missing data.
+
+```{r}
+# Check whether every individual has full information across 4 years
+library(dplyr)
+index_length <- data %>% group_by(id) %>% summarise(length(id))
+table(index_length$`length(id)`)
+```
+There are different number of observations due to the design of the study (e.g., a junior would have a most 2 years of data while a freshman could have 4 years of data).
+
+
+```{r, echo=FALSE}
+youth_dev_mean <- data %>% group_by(id) %>% summarise(score = mean(youth_dev)) 
+parent_att_value <- data %>% group_by(id) %>% summarise(score = mean(parent_att))
+cor(youth_dev_mean$`score`, parent_att_value$`score`)
+
+# Boxplot (parent_att & youth_dev)
+data_temp <- rbind(youth_dev_mean, parent_att_value)
+data_temp$yp <- rep(c("y","p"), each = length(unique(data$id)))
+data_temp %>%
+  ggplot(aes(x=yp, y=score, fill=yp)) +
+    geom_boxplot(fill=c("yellow","green"), alpha = 0.2) +
+    xlab("Parent(p) and Youth(y)")
+```
+We have observed the relation between our dependent variable, "youth_dev", and other variables. Specifically, we have found a low-level positive correlation ($0.109$) between the deviant attitude scores of youth and those of their parents. To calculate the deviant attitude scores of youth, we used the mean score from the four-year period. The accompanying boxplots indicate that parents tend to have stricter standards regarding deviant behaviors compared to their children. Moreover, the data suggests that female youth have slightly stricter standards compared to their male counterparts.
+
+```{r, echo=FALSE}
+# Boxplot (gender & youth_dev)
+data %>% ggplot(aes(x=gender, y=youth_dev, fill=gender)) + geom_boxplot(fill=c("blue","red"), alpha = 0.5) + xlab("Male(1) and Female(2)")
+```
+
+```{r, echo=FALSE}
+data %>% group_by(cohort) %>% summarise(n = length(index), mean = mean(youth_dev), SD = sd(youth_dev), mean_par = mean(parent_att), SD_par = sd(parent_att))
+data %>% group_by(gender) %>% summarise(n = length(index), mean = mean(youth_dev), SD = sd(youth_dev), mean_par = mean(parent_att), SD_par = sd(parent_att))
+data %>% group_by(age) %>% summarise(n = length(index), mean = mean(youth_dev), SD = sd(youth_dev), mean_par = mean(parent_att), SD_par = sd(parent_att))
+```
+The descriptive statistics additionally show that, on average, female youth have higher mean values for deviant behavior scores compared to their male counterparts. Moreover, when analyzing the means of each cohort and age, we observed a trend where children's attitudes towards deviant behavior tend to become less strict as they grow older.
+
+
+```{r, echo=FALSE}
+data_sub <- data[data$index %% 12 == 0,]
+xyplot(youth_dev ~ age |id, data=data_sub, col.line="blue", type=c("p","l"), main="Plots of Youth_Dev by Age: Joint Points")
+xyplot(youth_dev ~ age |id, data=data_sub, col.line="red", type=c("p","r"), main="Plots of Youth_Dev by Age: Linear regression")
+xyplot(youth_dev ~ age |id, data=data_sub, col.line="red", lwd=2, type=c("p","spline"), main="Plots of Youth_Dev by Age: Spline")
+xyplot(youth_dev ~ age |id, data=data_sub, col.line=c("red","black"), lwd=1, type=c("p","spline","r"), main="Plots of Youth_Dev by Age: Spline & Linear Regression")
+```
+The panel plots for each individual show joint points, linear regression, spline, and spline & linear regression. These plots are based on a subset of the data for the sake of visibility. When exploring the individual structure, we found that intercepts and slopes varied among individuals. For exploratory purposes, we also examined EDA for each cohort. The general tendency of the plots is similar to that of plots for the entire cohort. We reported our results specifically for Cohort 4.
+
+```{r, echo=FALSE}
+# Subdata by cohort
+data_c1 <- data[data$cohort==1,]
+data_c2 <- data[data$cohort==2,]
+data_c3 <- data[data$cohort==3,]
+data_c4 <- data[data$cohort==4,]
+data_c5 <- data[data$cohort==5,]
+data_c6 <- data[data$cohort==6,]
+data_c7 <- data[data$cohort==7,]
+
+# Same graphs for cohort 4
+xyplot(youth_dev ~ age |id, data=data_c4, col.line="blue", type=c("p","l"), main="Plots of Youth_Dev by Age (Cohort4): Joint Points")
+xyplot(youth_dev ~ age |id, data=data_c4, col.line="red", type=c("p","r"), main="Plots of Youth_Dev by Age (Cohort4): Linear regression")
+xyplot(youth_dev ~ age |id, data=data_c4, col.line="red", lwd=2, type=c("p","spline"), main="Plots of Youth_Dev by Age (Cohort4): Spline")
+xyplot(youth_dev ~ age |id, data=data_c4, col.line=c("red","black"), lwd=1, type=c("p","spline","r"), main="Plots of Youth_Dev by Age (Cohort4): Spline & Linear Regression")
+```
+For the next step, we observed line plots for individuals, including joint points, linear regressions, and quadratic regressions, using the same subset of data. Based on the graphs for linear and quadratic regressions, it appears that youth_dev remains relatively stable across ages, with a consistent level of variance.
+
+```{r, echo=FALSE}
+age.youth_dev <- aggregate(youth_dev ~ age + id , data=data_sub, FUN="mean")
+
+# Joint points
+plot(age.youth_dev$age, age.youth_dev$youth_dev, type = 'n', 
+     cex.main = 1.5,
+     xlab = 'Age', 
+     ylab = "youth_dev",
+     main = "Joint points for Person"
+     )
+
+selected_indices <- unique(data_sub$index)
+for (j in 1:length(selected_indices)){
+  sub <- data_sub[which(data_sub$index==j*12),]
+  lines(sub$age, sub$youth_dev, col=rainbow(length(selected_indices), start = 0, end = 1)[j])
+}
+```
+
+```{r, echo=FALSE}
+# Linear regression
+plot(data_sub$age, data_sub$youth_dev, type = 'n', 
+     cex.main = 1.5,
+     xlab = 'age', 
+     ylab = "Youth_dev",
+     main = "Separate Linear Regression for Person"
+     )
+
+selected_indices <- unique(data_sub$index)
+for (j in 1:length(selected_indices)){
+  sub <- data_sub[which(data_sub$index==j*12),]
+  fitted <- fitted(lm(youth_dev~age, sub))
+  lines(sub$age,fitted,col=rainbow(length(selected_indices), start = 0, end = 1)[j])
+}
+```
+
+```{r, echo=FALSE}
+# Quadratic regression
+plot(data_sub$age, data_sub$youth_dev, type = 'n', 
+     cex.main = 1.5,
+     xlab = 'age', 
+     ylab = "Youth_dev",
+     main = "Separate Quadratic Regression for Person"
+     )
+
+selected_indices <- unique(data_sub$index)
+for (j in 1:length(selected_indices)){
+  sub <- data_sub[which(data_sub$index==j*12),]
+  sub$agesq <- sub$age*sub$age
+  fitted <- fitted(lm(youth_dev ~ age + agesq, sub))
+  lines(sub$age, fitted, col=rainbow(length(selected_indices), start=0, end=1)[j])
+}
+```
+
+```{r, echo=FALSE}
+# Data average
+age.youth_dev2 <- aggregate(youth_dev ~ age, data=data, FUN="mean")
+plot(age.youth_dev2$age, age.youth_dev2$youth_dev,type='b', lwd=2,
+	 col='black',
+	 main="Overall Mean youth_dev by age",
+	 xlab="age",
+	 ylab="youth_dev",
+	 ylim=c(0,40))
+```
+
+We also observed a similar trend of relatively stable youth_dev across ages in the overall mean youth_dev.
+
+### Cohort effects
+```{r}
+age.youth_dev <- aggregate(youth_dev ~ age + cohort, data = data, FUN="mean")
+
+ggplot(age.youth_dev) + geom_line(aes(age, youth_dev, colour=cohort)) + coord_cartesian(ylim = c(25,36)) + scale_x_continuous(limits = c(11, 21), breaks = seq(9,23,1)) + ggtitle("Mean Youth_dev by age seperate lines for each cohort")
+```
+The cohort represents the age of the respondent when they join the survey. The age at which individuals start the survey appears to affect their scores of attitude toward deviant behavior, as the scores tend to decrease when individuals start the survey at an older age. Upon comparing cohorts, we found that those with lower ID numbers (i.e., Cohort 1 and 2, representing younger youth) tend to have a relatively stricter attitude towards deviant behavior.
+
+### Mean by age by type - gender
+```{r mean_by_year_by_type}
+age.youth_dev4 <- aggregate(youth_dev ~ age + gender, data=data, FUN="mean")
+plot(age.youth_dev4$age[1:11], age.youth_dev4$youth_dev[1:11],type='b', lwd=2,
+	 col='blue',
+	 main="Mean Youth_dev by age \n seperate lines for gender",
+	 xlab="age",
+	 ylab="youth_dev",
+	 ylim=c(0,40))
+lines(age.youth_dev4$age[12:22],age.youth_dev4$youth_dev[12:22],type='b',lwd=2,col='red')
+
+legend("bottomleft",legend=c("Male","Female"),col=c("blue","red"), lty=c(1,1),lwd=2, cex=1.1)
+```
+
+We observed that female youth tend to have a relatively stricter attitude towards deviant behavior, as indicated by their higher mean youth_dev.
+
+In summary, the graphs reveal a linear tendency in youth deviant behavior, but with different slopes and intercepts for each individual. Moreover, we observed group differences among cohorts and gender, although gender showed a relatively small group effect.
+
+
+## 2. Model fitting and refinement to arrive at a final model
+
+### Exploration
+
+Firstly, we explored individual-specific models using linear regression and quadratic regression. Each individual has a maximum of 4 data available. Therefore, for fitting quadratic models, it is only meaningful to use data with complete four-year information, as the number of model parameters for the quadratic model is 3. In order to obtain SSE as well, we need at least 4 data points across all four waves. Thus, for this analysis, we utilized the data with full information.
+
+```{r, eval=FALSE}
+index_length <- as.data.frame(data %>% group_by(id) %>% summarise(length(id)))
+index_length4 <- index_length[index_length$`length(id)`==4,] # with full data
+data_full <- data[data$id %in% unique(index_length4$id),]
+
+data_full$age_n <- ifelse(data_full$age == 11, 0,
+                     ifelse(data_full$age == 12, 1,
+                        ifelse(data_full$age == 13, 2,
+                          ifelse(data_full$age == 14, 3,
+                            ifelse(data_full$age == 15, 4,
+                              ifelse(data_full$age == 16, 5,
+                                ifelse(data_full$age == 17, 6,
+                                  ifelse(data_full$age == 18, 7,
+                                    ifelse(data_full$age == 19, 8,
+                                      ifelse(data_full$age == 20, 9, 10))))))))))
+
+data_full$index_new <- rep(1:length(unique(data_full$id)), each=4)
+```
+The linear regression model for each youth is as follows: $youth\_dev = intercept + age + R$.
+
+```{r, echo=FALSE, warning=FALSE}
+N <- length(unique(data_full$id))       # number of youth with full data
+ssmodel <- c(0)                  # object to hold model SS
+sstotal <- c(0)                  # object to hold total SS
+R2 <- matrix(99,nrow=N,ncol=2)   # create object to hold Rsquares
+
+for (i in 1:N){
+     sub <- data_full[ which(data_full$index_new==i),]
+     model1 <- lm(youth_dev ~ age_n, data=sub)
+     a <- anova(model1)
+     ssmodel <- ssmodel + a[1,2] 
+	 sstotal <- sstotal + sum(a[,2])
+	 R2[i,1:2] <- c(i,summary(model1)$r.squared)
+}
+
+R2meta <- ssmodel/sstotal          # compute meta R2 for model 1            
+R2.mod1 <- R2[1:N,2]               # hold R2 from first model
+
+# Plot R2 by sample size
+nj <- as.numeric(table(data_full$index_new))
+
+plot(nj,R2.mod1,
+     xlab="Sample Size for Each Person",
+ 	 ylab=expression(R^2),
+ 	 main=expression(paste(R^2," Model 1:   ",Y[it], " = ", beta[oi], " + ", beta[li], x[lit], " + ", R[it])),
+     cex=1.2,
+	 ylim=c(0,1),
+	 type='p',
+	 col="blue")
+x <- 1:5
+y <- rep(R2meta,5)
+lines(x,y,type='l',col="red")
+text(2.75,0.57,expression(paste(R^2,"meta = .50")),cex=1.2)
+
+# Please note that a warning may arise if all y values are identical across the ages.
+```
+
+The quadratic regression model for each youth is as follows: $youth\_dev = intercept + age + age^2 + R$
+
+```{r, echo=FALSE, warning=FALSE}
+ssmodel <- c(0)                  # object to hold model SS
+sstotal <- c(0)                  # object to hold total SS
+R2b <- matrix(99,nrow=N,ncol=2)   # create object to hold Rsquares
+
+for (i in 1:N){
+     sub <- data_full[which(data_full$index_new==i), ]
+     sub$agesq <- sub$age*sub$age
+     model2 <- lm(youth_dev ~ age + agesq, data=sub)
+     a <- anova(model2)
+     ssmodel <- ssmodel + a[1,2] + a[2,2]
+     sstotal <- sstotal + sum(a[,2])
+     R2b[i,1:2] <- c(i,summary(model2)$r.squared)
+}
+
+R2meta <- ssmodel/sstotal          # compute meta R2 for model2            
+R2.mod2 <- R2b[1:N,2]               # hold R2 from first model
+
+# Plot R2 by sample size
+nj <- as.numeric(table(data_full$index_new))
+
+plot(nj, R2.mod2, xlab="Sample Size for Each Person", ylab=expression(R^2),
+ 	 main=expression(paste(R^2," Model 2: ",Y[it], " = ", beta[oi], " + ", beta[li], x[lit], " + ", beta[q,i], x[qit]^2, " + " ,R[it])),
+ 	 cex=1.2, ylim=c(0,1), type='p', col="blue")
+x <- 1:5
+y <- rep(R2meta,5)
+lines(x,y,type='l',col="red")
+text(2.75, .85, expression(paste(R^2,"meta = .79")), cex=1.2)
+```
+
+Next, we compared models 1 and 2 by examining the improvement gained from adding the quadratic term. Adding the quadratic term resulted in a significant increase in $R^2$, and we also looked at which gender showed a better fit with the quadratic form. Both male and female youth showed an improvement in model fit with the addition of the quadratic term.
+
+```{r, echo=FALSE}
+# Model 1 and 2 comparison 
+plot(R2.mod1, R2.mod2, type="p", main="Improvement from Adding Quadratic Term", col="blue",
+     xlim=c(0,1), ylim=c(0,1), ylab=expression(paste(R^2," Model 2: ",Y[it], " = ", beta[oi], " + ", beta[li],
+     x[lit], " + ", beta[q,i], x[qit]^2, " + " ,R[it])), xlab=expression(paste(R^2," Model 1: ",Y[it], " = ", beta[oi], " + ", beta[li], x[lit], " + " ,R[it])),) 
+x <- 0:1
+y <- 0:1
+lines(x,y,type="l",col="red")
+```
+
+```{r, echo=FALSE}
+# Who is better fit
+R2mod1 <- as.data.frame(R2.mod1)
+R2mod2 <- as.data.frame(R2.mod2)
+Rsqs <- cbind(R2mod1,R2mod2)
+Rsqs$index_new <- 1:nrow(Rsqs)
+combined <- merge(data_full, Rsqs,by="index_new")
+
+mRsq <- combined[which(combined$gender==1),]
+fRsq <- combined[which(combined$gender==2),]
+
+plot(mRsq$R2.mod1, mRsq$R2.mod2, type="p", main="Who is better fit by Quadratic term",
+     col="blue", pch=21, cex=1.2, xlim=c(0,1), ylim=c(0,1),
+     ylab=expression(paste(R^2,"Model 2: ", Y[it], " = ", beta[oi], " + ", beta[li], x[lit], " + ", beta[q,i], x[qit]^2, " + ", R[it])), xlab= expression(paste(R^2," Model 1:   ",Y[it], " = ", beta[oi], " + ", beta[li], x[lit], " + " ,R[it])),)
+lines(fRsq$R2.mod1,fRsq$R2.mod2,type="p", col="red",pch=19)
+x <- 0:1
+y <- 0:1
+lines(x,y,type="l", col="red")
+legend(x="bottomright", legend=c("Male","Female"), col=c("blue","red"), pch=c(21,19), cex=1.2)
+```
+
+For the next step, we observed the variability after fitting OLS from lm and regressing the residuals. The graph with cubic age resembles the data variance function more closely. Therefore, a covariance structure with a cubic function of age is needed.
+
+```{r, echo=FALSE}
+# (Mean) squared residuals
+data$age_n <- ifelse(data$age == 11, 0,
+                ifelse(data$age == 12, 1,
+                  ifelse(data$age == 13, 2,
+                    ifelse(data$age == 14, 3,
+                      ifelse(data$age == 15, 4,
+                        ifelse(data$age == 16, 5,
+                          ifelse(data$age == 17, 6,
+                            ifelse(data$age == 18, 7,
+                              ifelse(data$age == 19, 8,
+                                ifelse(data$age == 20, 9, 10))))))))))
+
+data$agesq <- data$age_n**2
+ols <- lm(youth_dev ~ 1 + age_n + agesq + gender, data=data)
+data$res.sq <- residuals(ols)*residuals(ols)
+mres <- aggregate(res.sq ~ age_n + gender, data=data,FUN="mean")
+
+par(mfrow=c(2,2))
+male <- mres[which(mres$gender==1),]
+female <- mres[which(mres$gender==2),]
+
+plot(male$age_n, male$res.sq, type='l',col='blue', ylim = c(0,30),
+	 xlab="Age", ylab="Mean Squared Residuals", main="Data")
+lines(female$age_n, female$res.sq, type='l',col='red')
+legend("topleft",col=c("blue","red"),lty=1, cex=.8,
+       legend=c("Male","Female"))
+
+lin.male <- lm(res.sq~age_n, data=male)
+lin.female <- lm(res.sq~age_n,data=female)
+plot(male$age_n, fitted(lin.male),type="l",col="blue", xlim=c(0,10), ylim=c(0,30),
+     xlab="Age",ylab="Mean Squared Residuals", main="Fit using Linear Regression")
+lines(female$age_n, fitted(lin.female), type="l",col='red')
+legend("topleft", col=c("blue","red"), lty=1, cex=.8, 
+       legend=c("Male","Female"))
+
+male$agesq <- male$age_n*male$age_n
+quad.male <- lm(res.sq ~ age_n + agesq, data=male)
+female$agesq <- male$agesq
+quad.female <- lm(res.sq ~ age_n + agesq, data=female)
+plot(male$age_n,fitted(quad.male),type='l',col='blue',
+     xlim=c(0,10), ylim=c(0,30), xlab="Age", ylab="Mean Squared Residuals", main="Quadratic")
+lines(female$age_n, fitted(quad.female), type='l', col='red')
+legend("topleft",col=c("blue","red"),lty=1, cex=.8,
+       legend=c("Male","Female"))
+
+male$agecub <- male$age_n*male$age_n*male$age_n
+cub.male <- lm(res.sq ~ age_n + agesq + agecub, data=male)
+female$agecub <- male$agecub
+cub.female <- lm(res.sq ~ age_n + agesq + agecub, data=female)
+plot(male$age_n, fitted(cub.male),type='l',col='blue',
+     xlim=c(0,10), ylim=c(0,30), xlab="Age", ylab="Mean Squared Residuals", main="Cubic")
+lines(female$age_n, fitted(cub.female),type='l',col='red')
+legend("topleft",col=c("blue","red"),lty=1, cex=.8,
+       legend=c("Male","Female"))
+```
+
+Then, we observed that the correlation between adjacent time points showed highest correlation, which reflect the longitudinal nature of our data. However, given that serial correlation violates the assumption that 'observations of the error term are uncorrelated with each other', we will examine this issue more closely later on.
+
+```{r, echo=FALSE}
+# Serial correlation
+data$age_n <- factor(data$age_n)
+levels(data$age_n)[levels(data$age_n)=="0"] <- "age0"
+levels(data$age_n)[levels(data$age_n)=="1"] <- "age1"
+levels(data$age_n)[levels(data$age_n)=="2"] <- "age2"
+levels(data$age_n)[levels(data$age_n)=="3"] <- "age3"
+levels(data$age_n)[levels(data$age_n)=="4"] <- "age4"
+levels(data$age_n)[levels(data$age_n)=="5"] <- "age5"
+levels(data$age_n)[levels(data$age_n)=="6"] <- "age6"
+levels(data$age_n)[levels(data$age_n)=="7"] <- "age7"
+levels(data$age_n)[levels(data$age_n)=="8"] <- "age8"
+levels(data$age_n)[levels(data$age_n)=="9"] <- "age9"
+levels(data$age_n)[levels(data$age_n)=="10"] <- "age10"
+
+wide <- dcast(data, id ~ age_n, value.var="youth_dev")
+ages <- data.frame(wide$age0, wide$age1, wide$age2, wide$age3, wide$age4, wide$age5, wide$age6, wide$age7, wide$age8, wide$age9, wide$age10)
+
+ctab <- cor(ages, use="pairwise.complete.obs")
+round(ctab, digits=2)
+ctab[is.na(ctab)] <- 0
+```
+We would also like to visually represent the serial correlation using a graph. The NA values were changed to 0 for the sake of visualization.
+
+```{r, echo=FALSE}
+colorfun <- colorRamp(c("#CC0000","white","#3366CC"), space="Lab")
+plotcorr(ctab, col=rgb(colorfun((ctab+1)/2), maxColorValue=255))
+```
+
+To summarize, based on the above analyses, adding a quadratic term appears to enhance the goodness of fit. This improvement is likely due to the increased flexibility provided by the quadratic term in capturing the changes over time. Moreover, the presence of serial correlation suggests that additional investigation is necessary to address this issue.
+
+### Data modeling
+Based on previous exploratory data analysis, we established our preliminary model as below:
+```{r, echo=FALSE}
+# To prevent an error, we reload the data to return to the previous status quo
+
+# Load data
+data <- read.table("r_nyls_data.txt", header=TRUE)
+
+# Add integer individual id called index
+id <- unique(data$id) 
+index <- seq(1:length(id))
+to.add <- cbind(id,index)
+data <- merge(data, to.add, by=c("id"))
+n <- length(index)
+
+# Make id, gender, cohort factor variables
+data$id <- as.factor(data$id)
+data$gender <- as.factor(data$gender)
+data$cohort <- as.factor(data$cohort)
+
+data$age_n <- ifelse(data$age == 11, 0,
+                ifelse(data$age == 12, 1,
+                  ifelse(data$age == 13, 2,
+                    ifelse(data$age == 14, 3,
+                      ifelse(data$age == 15, 4,
+                        ifelse(data$age == 16, 5,
+                          ifelse(data$age == 17, 6,
+                            ifelse(data$age == 18, 7,
+                              ifelse(data$age == 19, 8,
+                                ifelse(data$age == 20, 9, 10))))))))))
+
+data$agesq <- data$age_n**2
+
+# Preliminary model
+summary(model.pre <- lmer(youth_dev ~ 1 + age_n + agesq + gender + age_n*gender + (1 + age_n + agesq | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))))
+```
+The preliminary model above is evaluated as a fitted mixed model that is near singular. This means that some dimensions of the variance-covariance matrix have been estimated as nearly zero. This may lead to the concerns of overfitted models that may have poor power, higher numerical problems and mis-convergence and inappropriate application of standard inferential procedures.
+
+First, we would like to begin by comparing with the simpler models. The results indicate that our preliminary model has the lowest AIC, BIC, and -2LogLikelihood values among the three models, which suggests a better model fit.
+
+```{r, echo=FALSE}
+# Empty model
+model.null <- lmer(youth_dev ~ 1 + (1|id), data=data, REML=F, control = lmerControl(optimizer = "Nelder_Mead"))
+
+# Model0 : age & age^2 as fixed
+model.0 <- lmer(youth_dev ~ 1 + age_n + agesq + (1|id), data=data, REML=F, control = lmerControl(optimizer = "Nelder_Mead"))
+
+screenreg(list(model.null, model.0, model.pre), custom.model.names = c("Null","Some Fixed","Preliminary"), single.row=T)
+```
+
+Then, we included a cubic age term based on the result from the MSE. However, the inclusion of a cubic age term showed worse model fit, and still singularity problem remained. Therefore, we have decided not to include the cubic age term into our preliminary model.
+```{r, echo=FALSE}
+data$agecub <- data$agesq * data$age_n
+data$xagecub <- data$agecub/10  # re-scaling year squared for convergence
+
+model.preCubic <- lmer(youth_dev ~ 1 + age_n + agesq + xagecub + gender + gender*age_n + (1 + age_n + agesq | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # Preliminary model w/ cubic year
+
+screenreg(list(model.pre, model.preCubic), custom.model.names = c("Quadratic","Cubic"), single.row=T)
+```
+
+Then, we attempted to refine our preliminary model by adding the parent_att variable, which we initially excluded due to the weak relation with youth_dev. The addition of parent_att variable resulted in a significant improvement of model fit. Therefore, we will proceed with the revised model for further analyses. However, we still received a message ('boundary (singular) fit: see help('isSingular')') during the model.add1 process. We suspect that this issue may be related to the complexity of our model, and thus we plan to conduct further analyses to simplify the model and address the singular problem.
+
+```{r, echo=FALSE}
+model.add1 <- lmer(youth_dev ~ 1 + age_n + agesq + gender + parent_att + gender*age_n + parent_att*age_n + (1 + age_n + agesq | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # Adding parent_att to preliminary model
+
+screenreg(list(model.pre, model.add1), custom.model.names = c("Prelim","add parent_att"), single.row=T)
+
+test.table <- anova(model.pre, model.add1) # Test whether we need to add parent_att as predictor
+p1  <- test.table[2,8]                                 
+df0 <- test.table[2,7] - 1
+p0  <- pchisq(test.table[2,6],df0,lower.tail=FALSE)    
+pvalue <- .5*(p1+p0)
+test.out <- matrix(c(test.table[2,6],test.table[2,7],df0,p1,p0,pvalue),nrow=1)
+test.out <- as.data.frame(test.out)
+names(test.out) <- c("LR statistic","df1","df0","p1","p0","pvalue")
+round(test.out,digits=3)
+```
+
+As a first step for the model reduction, we tested whether we would need age$^2$ as a random effect.
+
+```{r, echo=FALSE}
+model.reduced1 <- lmer(youth_dev ~ 1 + age_n + agesq + gender + parent_att + gender*age_n + parent_att*age_n + (1 + age_n | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # no yrsq random effect
+
+test.table <- anova(model.reduced1, model.add1)
+p1  <- test.table[2,8]                                 
+df0 <- test.table[2,7] - 1
+p0  <- pchisq(test.table[2,6],df0,lower.tail=FALSE)    
+pvalue <- .5*(p1+p0)
+test.out <- matrix(c(test.table[2,6],test.table[2,7],df0,p1,p0,pvalue),nrow=1)
+test.out <- as.data.frame(test.out)
+names(test.out) <- c("LR statistic","df1","df0","p1","p0","pvalue")
+round(test.out,digits=3)
+
+screenreg(list(model.pre, model.add1, model.reduced1), custom.model.names = c("Prelim", "Add1","Reduced1"), single.row=T)
+```
+
+Based on the results of the LR test (LR=60.04943, p=5.737024e-13), we can conclude that age\^2 should be treated as a random (needs a random slope).
+
+Then, we tested whether we would need the interaction term age_n\*parent_att.
+
+```{r, echo=FALSE}
+model.reduced2 <- lmer(youth_dev ~ 1 + age_n + agesq + gender + parent_att + gender*age_n + (1 + age_n + agesq | id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # leave out age_n*parent_att
+
+test.table <- anova(model.reduced2, model.add1)
+p1  <- test.table[2,8]                                 
+df0 <- test.table[2,7] - 1
+p0  <- pchisq(test.table[2,6],df0,lower.tail=FALSE)    
+pvalue <- .5*(p1+p0)
+test.out <- matrix(c(test.table[2,6],test.table[2,7],df0,p1,p0,pvalue),nrow=1)
+test.out <- as.data.frame(test.out)
+names(test.out) <- c("LR statistic","df1","df0","p1","p0","pvalue")
+round(test.out,digits=3)
+
+screenreg(list(model.pre, model.add1, model.reduced2), custom.model.names = c("Prelim", "add parent_att", "Reduced2"), single.row=T)
+```
+
+Although the corresponding LRT of the interaction term 'age_n\*parent_att' indicates the significant difference between two models with p-value $0.045$, the coefficient of interaction term is nearly zero and not significant. Thus, based on the information criteria and for a better parsimonisity, we decided to remove the interaction term in our final model.
+
+
+```{r, echo=FALSE}
+# All the AICs & BICs
+all.aic <- rbind(AIC(model.null), AIC(model.pre), AIC(model.add1), AIC(model.preCubic), AIC(model.reduced1), AIC(model.reduced2))
+row.names(all.aic) <- c("null", "prelim", "parent_att","cubic","reduced1","reduced2")
+all.bic <- rbind(BIC(model.null), BIC(model.pre), BIC(model.add1), BIC(model.preCubic), BIC(model.reduced1), BIC(model.reduced2))
+row.names(all.bic) <- c("null", "prelim", "parent_att","cubic","reduced1","reduced2")
+
+all.ic <- cbind(all.aic, all.bic)
+colnames(all.ic) <- c("aic", "bic")
+
+all.ic
+```
+Based on the comparison, our temporary final model below demonstrated lowest BIC and second lowest AIC values with a smaller number of parameters, compared to the other models.
+
+ [HLM form] 
+           Level 1: $YouthDev_{it} = \beta_0 + \beta_1 age + \beta_2 age^2 + R_{it}$ 
+                where $R_{it} \sim N(0, \sigma^2)$ and independent 
+           Level 2: $\beta_0 = \gamma_{00} + \gamma_{01} gender + \gamma_{02} ParentAtt + U_{0t}$
+           
+           $\beta_1 = \gamma_{10} + \gamma_{11}  gender + U_{1t}$
+           $\beta_2 = \gamma_{20} + U_{2t}$
+    
+                where
+                $$ \begin{pmatrix}U_{0t}\\ U_{1t}\\ U_{2t}\end{pmatrix} \sim\ N \Bigg( \begin{pmatrix}0\\ 0\\ 0\end{pmatrix},
+                     \begin{pmatrix}\tau_0^2 & \tau_{01} & \tau_{02}\\ \tau_{01} & \tau_1^2 & \tau_{12} \\ \tau_{02} & \tau_{12} & \tau_2^2
+                     \end{pmatrix} \Bigg)$$ iid and independent of $R_{it}$
+
+  [LMM] $YouthDev_{it} = \gamma_{00} + \gamma_{10} age + \gamma_{20} age^2 + \gamma_{01} gender + \gamma_{02} ParentAtt + \gamma_{11} gender*age + U_{0t} + U_{1t} age + U_{2t} age^2 + R_{it}$
+
+  [Marginal model] $YouthDev\_{it} \sim\ N\begin{pmatrix}\mu_{it}, Var(Y_{it})\end{pmatrix}$ 
+               where $\mu = \gamma_{00} + \gamma_{10}age + \gamma_{20}age^2 +\gamma_{01}gender + \gamma_{02}ParentAtt + \gamma_{11}gender*age$ 
+                     $Var(Y_{it}) = \tau_0^2 + \tau_1^2(age)_{it}^2 + \tau_2^2(age)_{it}^4 + 2\tau_{01}(age)_{it} + 2\tau_{02}(age)_{it}^2 + 2\tau_{12}(age)_{it}^3 + \sigma^2$
+
+
+Next, we attempted to improve our temporary final model by relaxing the assumption of compound symmetry and considering serial correlation.
+```{r, echo=FALSE}
+data$xagesq <- data$agesq/10  # re-scaling age squared for convergence
+
+model.reduced2_scaled <- lmer(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n + (1 + age_n + xagesq| id), data=data, REML=FALSE, control = lmerControl((optimizeer = "Nelder_Mead"))) # leave out age_n*parent_att
+```
+
+The singular problem has not been resolved yet. Consequently, the temporary final model cannot be estimated with the lme function as it fails to converge. Thus, we decided to remove the linear and quadratic random effects to prioritize the stability of estimation. Then, we compared the models by modeling serial correlation.
+```{r}
+# AR(1) with no linear & quadratic random effects, no serial correlation
+nlme.final_nosc <- lme(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n, random = ~ 1 | id, data=data)
+
+# AR(1) with no linear & quadratic random effects
+nlme.final_ar1 <- lme(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n, random = ~ 1 | id, correlation = corAR1(form = ~ 1 | id), data=data)
+
+# ARMA(1,1) with no linear & quadratic random effects & serial correlation ARMA = 1,1
+nlme.final_arma11 <- lme(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n, random = ~ 1 | id, correlation = corARMA(form = ~ 1 + age_n |id, p=1, q=1), data=data)
+
+screenreg(list(nlme.final_nosc, nlme.final_ar1, nlme.final_arma11))
+```
+
+
+In conclusion, our final model is as follows: 
+  [Hierarchical model] 
+           Level 1: $YouthDev_{it} = \beta_0 + \beta_1 age\_n_{it} + \beta_2 age\_n_{it}^2 + R_{it}$ 
+              where $R_{it} = \rho R_{i(t-1)} + \epsilon_{it}$ and $\epsilon_{it} \sim N(0, \sigma^2)$
+           Level 2: $\beta_0 = \gamma_{00} + \gamma_{01} gender + \gamma_{02} ParentAtt + U_{0t}$ 
+                    $\beta_1 = \gamma_{10} + \gamma_{11} gender$
+                    $\beta_2 = \gamma_{20}$
+              where $U_{0t} \sim\ N(0, \tau_0^2)$
+
+  [LMM] 
+      $YouthDev_{it} = \gamma_{00} + \gamma_{10} age\_n + \gamma_{01} gender + \gamma_{02} ParentAtt + \gamma_{11} age\_n*gender + \gamma_{20} age\_n^2 + U_{0t} + R_{it}$ 
+      $YouthDev_{it} = 30.20 - 1.20 age\_n + 0.58 xagesq + 0.51 gender + 0.10 ParentAtt + 0.18 age\_n*gender + U_{0t} + R_{it}$
+
+```{r}
+# Final Model: random intercept model with AR(1) serial correlation
+nlme.final <- lme(youth_dev ~ 1 + age_n + xagesq + gender + parent_att + gender*age_n, random = ~ 1 | id, correlation = corAR1(form = ~ 1 | id), data=data)
+
+Cov.beta9 <- (nlme.final$varFix) # variance covariance matrix for the fixed effects
+se.beta9 <- sqrt(diag(nlme.final$varFix))
+H <- -solve(Cov.beta9)
+
+# Get model based covariance & correlation matrix for Y
+tau0 <- 2.624546**2
+age_n <- matrix(0:10, nrow=11, ncol=1)
+timeXtime <- age_n %*% t(age_n)
+between <- tau0*timeXtime
+
+# Part due to serial correlation (i.e., AR(1))
+rho <- 0.295949 
+sigma2 <- nlme.final$sigma**2
+
+omega <- diag(11)
+for (i in 2:11) { 
+  for (j in 1:10) { 
+    power <- i-1
+    omega[i,j] <- rho**power
+    omega[j,i] <- omega[i,j]
+  }
+}
+
+within <- sigma2*omega
+covY <- between + within
+
+# Correlation matrix for Y
+isd <- solve(diag(sqrt(diag(covY))))
+Ry <- isd %*% covY %*% isd
+```
+
+Based on our final model, we obtained the covariance and correlation matrix for Y. The estimated correlation matrix for Y shows less correlation as the age intervals become bigger.
+
+## Examination of assumptions for the final model
+### Graph EBLUPS
+```{r, echo=FALSE}
+# Extract random effects from model object and make a new dataframe
+ranU <- as.data.frame(ranef(nlme.final))
+ranU$id <- as.numeric(row.names(ranU))
+ranU_new_temp <- ranU$`(Intercept)`
+ranU_new <- data.frame(grpvar = 'id', term = rep('(Intercept)', each = length(unique(ranU$id))), grp=rep(ranU$id, 1), condval = ranU_new_temp)
+
+U0j <- ranU_new[which(ranU_new$term=="(Intercept)"), ]
+U0j <-U0j[order(U0j$condval), ]
+
+U0j$xgrp <- seq(1:n)
+```
+
+```{r, echo=FALSE}
+# Draw graph for U0j
+plot(U0j$xgrp, U0j$condval,type="p", main="Final Model: Random intercepts",
+     xlab="ID (sort by Uo)", ylab="EBLUP of U0j", col="blue")
+```
+
+```{r}
+qqdata_u0 <- qqnorm(U0j$condval)
+```
+The above plots show the EBLUP of U0j by IDs.
+
+```{r}
+plot(qqdata_u0$x, qqdata_u0$y, type="p", pch=19, col="red",
+main="Normal QQ plot of U0j",
+     xlab="Theoretical Value",
+     ylab="Estimated U0j (EBLUPS)",
+     ylim=c(-10,10))
+qqline(U0j$condval,col="steelblue")
+```
+
+The above shows the normal qqplots of U0j.
+
+```{r}
+par(mfrow=c(2,2))
+fit <- fitted(nlme.final)
+
+plot(nlme.final) # residual
+qqnorm(nlme.final) # qqnorm
+hist(residuals(nlme.final), breaks=50, density = 20, col='seagreen') # histogram of standardized residuals
+
+# some things to describe the model
+plot.new()
+text(0.5, 1.0, "nlme.final")
+text(0.5, 0.85, "AIC = 33487.88")
+text(0.5, 0.6, "BIC = 33548.59")
+```
+
+These are estimated random effects, which we got above using ranef().
+
+```{r}
+res.margin <- resid_marginal(nlme.final, type="pearson")
+head(res.margin)
+```
+
+To summarize, we can observe that the points mostly lie along the straight diagonal line in the QQ Plot. Similarly, the residual plot shows that the points are relatively randomly dispersed, indicating that our final linear model is appropriate.
+
+The interpretation of our final model is as follows: On average, younger female youths whose parents have higher attitude scores toward deviant behavior have higher scores of attitude toward deviant behavior (which means they are stricter in deviant behavior). For a more specific interpretation, the scores of attitude toward deviant behavior for girls are on average 0.50 points higher than those of boys. Older youths tend to have lower scores than those who are younger, on average. Youths whose parents have one point higher deviant behavior attitude scores have scores that are 0.10 points higher. Youths tend to have scores that are 1.2 points lower as they age by a year. The interaction of age and gender are positive, suggesting that while growing up typically leads to lower scores of attitude toward deviant behavior, this effect is weaker for female youths.
+
+
+

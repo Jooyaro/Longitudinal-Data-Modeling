@@ -1,7 +1,7 @@
 # Longitudinal-Data-Modeling
 This was a final team project for coursework EPSY587 at UIUC(SP2023).
 
-/textbf{Data}: The data for this study is from the National Youth Longitudinal Study (6,287 observations of 7 variables with no missing data).
+Data: The data for this study is from the National Youth Longitudinal Study (6,287 observations of 7 variables with no missing data).
 The NYLS survey was conducted over four years (from 1976 to 1980), and respondents answered a questionnaire every year.
 Kids were asked to rate the wrongness of nine deviant behaviors, such as cheating on tests at school, marijuana use, and breaking into cars,
 on a 4-Likert scale (1=“not wrong” to 4 = “very wrong”).
